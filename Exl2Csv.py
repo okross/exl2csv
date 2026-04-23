@@ -1,34 +1,41 @@
 import streamlit as st
 import pandas as pd
-import io
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="AI 數據餵食轉換器", layout="centered")
 
-st.title("🤖 AI 數據餵食轉換器 (Excel to CSV)")
-st.write("將賣家精靈或其他工具導出的 Excel 轉為 AI 最易讀的 CSV 格式。")
+st.title("🤖 AI 數據餵食轉換器")
+
+category_map = {
+    "關鍵字列表 (詞庫表現)": "Keyword_List",
+    "關鍵字搜索結果表現 (賣家精靈分析)": "Keyword_res",
+    "BSRTop 100結果表現 (類目分析)": "BSR_res",
+    "產品Review (評論分析)": "P.Review"
+}
+
+selected_label = st.selectbox("請選擇檔案類型：", options=list(category_map.keys()))
+category_prefix = category_map[selected_label]
 
 uploaded_file = st.file_uploader("上傳 Excel 檔案", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
     try:
-        # 1. 讀取第一個 Sheet
         df = pd.read_excel(uploaded_file, sheet_name=0)
-        
-        # 2. 清理資料：移除全空的行與列，避免 AI 讀到多餘的逗號
         df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
         
-        st.success(f"讀取成功！已自動清理空行，剩餘 {df.shape[0]} 列 x {df.shape[1]} 欄。")
-        st.dataframe(df.head(3))
+        # 固定使用 GMT+8 
+        local_time = datetime.utcnow() + timedelta(hours=8)
+        timestamp = local_time.strftime("%Y%m%d%H%M%S")
+        new_filename = f"{category_prefix}_{timestamp}.csv"
 
-        # 3. 轉換為純 UTF-8 (不含 BOM，AI 讀取最順暢)
-        # 為了確保 AI 好讀，我們保留標題 (index=False)
         csv_data = df.to_csv(index=False, encoding='utf-8')
 
         st.download_button(
-            label="📥 下載 AI 專用 CSV",
+            label=f"📥 下載 {new_filename}",
             data=csv_data,
-            file_name=f"{uploaded_file.name.rsplit('.', 1)[0]}_for_AI.csv",
+            file_name=new_filename,
             mime="text/csv",
         )
+        st.success(f"轉換完成！檔名已校正為 GMT+8 時間。")
     except Exception as e:
         st.error(f"發生錯誤: {e}")
